@@ -1,0 +1,89 @@
+import subprocess
+import tkinter as tk
+import tkinter.scrolledtext as tksc
+from tkinter import filedialog
+from tkinter.filedialog import asksaveasfilename
+
+
+def do_command(command):
+    """Executes the network command and updates the GUI text box."""
+    global command_textbox, url_entry
+    
+    # url
+    url_val = url_entry.get()
+    if (len(url_val) == 0):
+        # Default to localhost if entry is empty
+        url_val = "::1" 
+
+    # Clear the text box for new results
+    command_textbox.delete(1.0, tk.END)
+    command_textbox.insert(tk.END, f"Running {command} on {url_val}...\n")
+    command_textbox.insert(tk.END, "-"*50 + "\n")
+    command_textbox.update()
+
+    # Use Popen to run the command and read output line-by-line
+    # shell=True is often required on Windows to find command-line tools
+    try:
+        with subprocess.Popen(command + ' ' + url_val, 
+                             stdout=subprocess.PIPE, 
+                             stderr=subprocess.PIPE,
+                             bufsize=1, 
+                             universal_newlines=True, 
+                             shell=True) as p:
+            for line in p.stdout:
+                command_textbox.insert(tk.END, line)
+                command_textbox.update()
+                command_textbox.see(tk.END) # Auto-scroll to the bottom
+    except Exception as e:
+        command_textbox.insert(tk.END, f"Error running command: {e}")
+
+def mSave():
+    """Saves the contents of the scrolled text box to a .txt file."""
+    filename = asksaveasfilename(defaultextension='.txt',
+                                 filetypes=(('Text files', '*.txt'),
+                                            ('All files', '*.*')))
+    if filename:
+        with open(filename, mode='w') as file:
+            text_to_save = command_textbox.get("1.0", tk.END)
+            file.write(text_to_save)
+
+# --- GUI Setup ---
+
+root = tk.Tk()
+root.title("Network Analyzer Tool")
+
+frame = tk.Frame(root)
+frame.pack(padx=20, pady=20)
+
+# 1. URL Entry Section
+label = tk.Label(frame, text="Enter a URL or IP of interest:")
+label.pack()
+url_entry = tk.Entry(frame, width=50)
+url_entry.pack(pady=5)
+
+# 2. Command Buttons Section
+# We use lambda to pass the specific command string to the shared function
+ping_btn = tk.Button(frame, text="Ping (Check Connectivity)", 
+                     command=lambda: do_command("ping"),
+                     bg="white", width=30)
+ping_btn.pack(pady=2)
+
+trace_btn = tk.Button(frame, text="Tracert (View Path)", 
+                      command=lambda: do_command("tracert"),
+                      bg="white", width=30)
+trace_btn.pack(pady=2)
+
+ns_btn = tk.Button(frame, text="NSLookup (DNS Query)", 
+                   command=lambda: do_command("nslookup"),
+                   bg="white", width=30)
+ns_btn.pack(pady=2)
+
+# 3. Output Section
+command_textbox = tksc.ScrolledText(frame, height=15, width=80, font=("Consolas", 10))
+command_textbox.pack(pady=10)
+
+# 4. Save Section
+save_btn = tk.Button(frame, text="Save Results to File", command=mSave, fg="black")
+save_btn.pack(pady=5)
+
+root.mainloop()
